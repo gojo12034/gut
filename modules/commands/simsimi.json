@@ -1,0 +1,100 @@
+const simsimiApi = require('simsimi-api');
+const cron = require("cron");
+
+const chatEnabledMap = new Map();
+
+module.exports.config = {
+    name: "simsimi",
+    version: "4.3.7",
+    hasPermission: 0,
+    credits: "ZiaRein/Modified By biru",
+    usePrefix: false,
+    description: "Chat via SimSimi",
+    commandCategory: "chatbot",
+    usages: [`Please add some context\n\nHow to use?\n${global.config.PREFIX}sim <context>\n\nExample:\n${global.config.PREFIX}sim hi\n`],
+    cooldowns: 5,
+    dependencies: {
+        "simsimi-api": "",
+        cron: ""
+    }
+};
+
+// Function to interact with SimSimi API using simsimi-api package
+async function getSimSimiResponse(content, language = 'ph') {
+    try {
+        const response = await simsimiApi.simtalk(content, language);
+        console.log("API Response: ", response);
+        if (response.status === "200" && response.message) {
+            // Introduce a delay of 2 to 5 seconds (adjust as needed)
+            const delayMs = Math.floor(Math.random() * (6000 - 3000 + 1)) + 3000; // Random delay between 2 to 5 seconds
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+
+            return { error: false, data: response.message };
+        } else {
+            return { error: true, data: {} };
+        }
+    } catch (error) {
+        console.error("API Request Error: ", error);
+        return { error: true, data: {} };
+    }
+}
+
+module.exports.onLoad = function ({ api }) {
+    if (typeof global === "undefined") global = {};
+    if (typeof global.simsimi === "undefined") global.simsimi = new Map;
+
+    // Create a cron job that runs every 20 minutes
+    const job = new cron.CronJob('*/20 * * * *', async function () {
+        try {
+            api.getThreadList(25, null, ['INBOX'], async (err, data) => {
+                if (err) return console.error("Error fetching thread list: ", err);
+                for (const thread of data) {
+                    if (thread.isGroup) {
+                        chatEnabledMap.set(thread.threadID, true);
+                        // Send message to the thread
+                        await api.sendMessage("", thread.threadID);
+                    }
+                }
+
+                // Wait for 10 minutes before disabling the sim
+                setTimeout(() => {
+                    chatEnabledMap.forEach((value, key) => {
+                        chatEnabledMap.set(key, false);
+                        // Send message to the thread
+                        api.sendMessage("", key);
+                    });
+                }, 10 * 60 * 1000); // 10 minutes in milliseconds
+            });
+        } catch (error) {
+            console.error("Error in cron job: ", error);
+        }
+    });
+
+    // Start the cron job
+    job.start();
+};
+
+module.exports.handleEvent = async function ({ api: b, event: a }) {
+    const { threadID: c, messageID: d, senderID: e, body: f } = a;
+    const g = (e) => b.sendMessage(e, c, d);
+
+    const botUserID = global.config.BOT_ID;
+
+    if (chatEnabledMap.has(c) && e != botUserID && chatEnabledMap.get(c)) {
+        if (f === "" || d == global.simsimi.get(c)) return;
+        const { data: h, error: i } = await getSimSimiResponse(f);
+
+        return !i ? g(h) : null;
+    }
+}
+
+module.exports.run = async function ({ api: b, event: a, args: c }) {
+    const { threadID: d, messageID: e } = a;
+    const f = (c) => b.sendMessage(c, d, e);
+
+    const botUserID = global.config.BOT_ID;
+
+    const { data: g, error: h } = await getSimSimiResponse(c.join(""), 'en');
+
+    return !h ? f(g) : null;
+};
