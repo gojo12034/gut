@@ -1,21 +1,18 @@
- const { spawn } = require("child_process");
+const { spawn } = require("child_process");
 const express = require("express");
-const { createProxyMiddleware } = require("http-proxy-middleware");
 
 const app = express();
 const port = process.env.PORT || 8080;
-const target = "http://de01.uniplex.xyz:5611";
 
-app.use('/', createProxyMiddleware({
-    target: target,
-    changeOrigin: true,
-    pathRewrite: (path, req) => {
-        return path.replace('/', '');
-    },
-    onProxyReq: (proxyReq, req, res) => {
-        console.log(`Proxying request to: ${target}${req.url}`);
-    }
-}));
+// Simple route for root URL
+app.get('/', (req, res) => {
+    res.send('<h1>Welcome to the Server!</h1>');
+});
+
+// Optional: Add more routes if needed
+// app.get('/api', (req, res) => {
+//     res.json({ message: "API is working!" });
+// });
 
 function startBotProcess(script) {
     const child = spawn("node", ["--trace-warnings", "--async-stack-traces", script], {
@@ -38,11 +35,10 @@ function startBotProcess(script) {
 
 startBotProcess("main.js");
 // startBotProcess("monitor.js");
-//*startBotProcess("telegram/index.js")
+// startBotProcess("telegram/index.js");
 
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
 }).on('error', (err) => {
     console.error('Error starting server:', err);
 });
-
