@@ -90,6 +90,6 @@ module.exports.run = function({ api, event, args }) {
         }
     } else {
         console.log("Invalid command or no thread ID provided.");
-        return api.sendMessage("Invalid command or insufficient parameters.", event.threadID);
+        //return api.sendMessage("Invalid command or insufficient parameters.", event.threadID);
     }
 };
