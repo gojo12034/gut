@@ -44,7 +44,7 @@ module.exports = ({ api }) => {
   const config = {
     autoRestart: {
       status: true,
-      time: 40, // Interval in minutes
+      time: 100, // Interval in minutes
       note: 'To avoid problems, enable periodic bot restarts',
     },
     greetingsEnabled: true, 
