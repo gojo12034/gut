@@ -19,6 +19,7 @@
             "chalk",
             "mqtt",
             "downlib",
+            "ws3-fca",
             "form-data",
             "https-proxy-agent"
         ],
