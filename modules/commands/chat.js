@@ -1,22 +1,22 @@
 const axios = require("axios");
-const cron = require("node-cron");
+const { CronJob } = require("cron");
 
 const chatEnabledMap = new Map();
-const forcedOffMap = new Map(); // stores threads manually turned off
+const forceDisabledMap = new Map(); // to track if manually disabled
 
 module.exports.config = {
     name: "chat",
-    version: "4.4.0",
+    version: "4.3.9-auto",
     hasPermission: 0,
-    credits: "ZiaRein/Modified By Biru + AutoOnByVal",
+    credits: "ZiaRein/Modified By Biru + ChatGPT",
     usePrefix: false,
-    description: "Chat via SimSimi Ph ver",
+    description: "Chat via SimSimi PH ver + Auto Mode",
     commandCategory: "chatbot",
-    usages: [`Please add some context\n\nHow to use?\n${global.config.PREFIX}chat <context>\n\nExample:\n${global.config.PREFIX}chat hi\n`, "on", "off"],
+    usages: [`chat <message>`, "on", "off"],
     cooldowns: 5,
     dependencies: {
         axios: "",
-        "node-cron": ""
+        cron: ""
     }
 };
 
@@ -32,7 +32,7 @@ async function simsimi(content) {
             return { error: true, data: {} };
         }
     } catch (error) {
-        console.error("API Request Error: ", error); 
+        console.error("API Request Error: ", error);
         return { error: true, data: {} };
     }
 }
@@ -45,77 +45,76 @@ module.exports.onLoad = async function ({ api }) {
     if (typeof global === "undefined") global = {};
     if (typeof global.simsimi === "undefined") global.simsimi = new Map;
 
-    // Every 30 minutes → Auto turn chat ON & say "hi"
-    cron.schedule("*/30 * * * *", async () => {
-        for (let [threadID] of chatEnabledMap) {
-            if (!forcedOffMap.get(threadID)) {
-                chatEnabledMap.set(threadID, true);
-                try {
-                    await api.sendMessage("hi", threadID);
-                    console.log(`[Auto ON] Sent "hi" to ${threadID}`);
-                } catch (e) {
-                    console.error(`Failed to send "hi" to ${threadID}`, e);
-                }
-            }
-        }
-    });
+    // Auto-enable every 30 minutes
+    new CronJob("*/30 * * * *", async function () {
+        const allThreads = [...chatEnabledMap.keys()];
+        if (allThreads.length === 0) return;
 
-    // After 10 mins → Auto turn chat OFF & say "bye"
-    cron.schedule("10-59/30 * * * *", async () => {
-        for (let [threadID] of chatEnabledMap) {
-            if (!forcedOffMap.get(threadID)) {
-                chatEnabledMap.set(threadID, false);
-                try {
-                    await api.sendMessage("bye", threadID);
-                    console.log(`[Auto OFF] Sent "bye" to ${threadID}`);
-                } catch (e) {
-                    console.error(`Failed to send "bye" to ${threadID}`, e);
+        for (const threadID of allThreads) {
+            if (forceDisabledMap.get(threadID)) continue; // skip if forcefully off
+
+            chatEnabledMap.set(threadID, true);
+            api.sendMessage("hi", threadID);
+
+            // Schedule auto-disable after 10 minutes
+            setTimeout(() => {
+                if (!forceDisabledMap.get(threadID)) {
+                    chatEnabledMap.set(threadID, false);
+                    api.sendMessage("bye", threadID);
                 }
-            }
+            }, 10 * 60 * 1000);
         }
-    });
+    }, null, true, "Asia/Manila"); // change TZ if needed
 };
 
 module.exports.handleEvent = async function ({ api, event }) {
     const { threadID, messageID, senderID, body } = event;
-    const reply = (msg) => api.sendMessage(msg, threadID, messageID);
-    const botUserID = global.config.BOT_ID;
+    const send = (msg) => api.sendMessage(msg, threadID, messageID);
 
-    if (chatEnabledMap.has(threadID) && senderID !== botUserID && chatEnabledMap.get(threadID)) {
-        if (body === "" || messageID === global.simsimi.get(threadID)) return;
-        const { data, error } = await simsimi(body);
-        if (!error) {
-            const randomDelay = Math.floor(Math.random() * (5000 - 3000 + 1)) + 3000;
-            await delay(randomDelay);
-            reply(data);
-        }
+    if (!chatEnabledMap.get(threadID) || senderID == global.config.BOT_ID || !body) return;
+
+    if (global.simsimi.get(threadID) === messageID) return;
+
+    const { data, error } = await simsimi(body);
+    if (!error) {
+        const randomDelay = Math.floor(Math.random() * (5000 - 3000 + 1)) + 3000;
+        await delay(randomDelay);
+        send(data);
     }
 };
 
 module.exports.run = async function ({ api, event, args }) {
     const { threadID, messageID } = event;
-    const reply = (msg) => api.sendMessage(msg, threadID, messageID);
+    const send = (msg) => api.sendMessage(msg, threadID, messageID);
 
     if (args[0] === "on") {
         chatEnabledMap.set(threadID, true);
-        forcedOffMap.set(threadID, false); // remove override
-        return reply("🟢");
+        forceDisabledMap.set(threadID, false);
+        send("The chat is now enabled.");
+        return;
     }
 
     if (args[0] === "off") {
         chatEnabledMap.set(threadID, false);
-        forcedOffMap.set(threadID, true); // set override
-        return reply("🔴");
+        forceDisabledMap.set(threadID, true);
+        send("The chat is now disabled.");
+        return;
     }
 
-    if (chatEnabledMap.has(threadID) && chatEnabledMap.get(threadID) && args.length === 0) {
-        return reply(`Please add some context\n\nHow to use?\n${global.config.PREFIX}chat <context>\n\nExample:\n${global.config.PREFIX}chat how are you\n\n🗨️`);
+    if (!chatEnabledMap.get(threadID)) {
+        send("Chatbot is disabled. Use 'chat on' to enable.");
+        return;
+    }
+
+    if (args.length === 0) {
+        send(`Please add some context\n\nHow to use?\n${global.config.PREFIX}chat <context>`);
+        return;
     }
 
     const { data, error } = await simsimi(args.join(" "));
     if (!error) {
         const randomDelay = Math.floor(Math.random() * (5000 - 3000 + 1)) + 3000;
         await delay(randomDelay);
-        reply(data);
+        send(data);
     }
 };
