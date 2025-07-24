@@ -65,6 +65,7 @@
     "i": "^0.3.7",
     "is-hexcolor": "^1.0.0",
     "jimp": "^0.22.12",
+    "kleur": "^4.1.5",
     "llyrics": "^1.1.7",
     "lodash.pad": "^4.5.1",
     "lodash.padend": "^4.6.1",
