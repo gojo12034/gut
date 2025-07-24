@@ -23,7 +23,7 @@
   "license": "GPL-3.0",
   "author": "Yan Maglinte",
   "dependencies": {
-    "@dongdev/fca-unofficial": "^1.0.19",
+    "@dongdev/fca-unofficial": "^1.0.20",
     "aes-js": "^3.1.2",
     "ansi": "^0.3.1",
     "ansi-to-html": "^0.7.2",
